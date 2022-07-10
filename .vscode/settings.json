@@ -1,0 +1,8 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/liuchuangye/ROS_TEST/devel/lib/python3/dist-packages",
+        "/home/liuchuangye/whu_drones_ws/src/acfly-mavros/mavros_msgs/devel/lib/python3/dist-packages",
+        "/home/liuchuangye/ros_ws/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ]
+}

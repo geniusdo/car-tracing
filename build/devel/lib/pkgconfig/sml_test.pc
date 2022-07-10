@@ -1,0 +1,8 @@
+prefix=/home/liuchuangye/catkin_ws/src/sml_test/build/devel
+
+Name: sml_test
+Description: Description of sml_test
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

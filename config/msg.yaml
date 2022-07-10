@@ -1,0 +1,20 @@
+#PID参数
+Ki: 1
+Kd: 0.5
+Kp: 5.0
+#Derivative low-pass filter time constant
+tau: 0.02
+#Output limits (pid->out)
+limMin: -1.0
+limMax: 1.0
+#Integrator limits
+limMinInt: -10.0
+limMaxInt: 10.0
+# Sample time
+T: 0.05
+#用于检测小车停止
+limvel: 2.0
+#takeof vel 
+takeof_vel: 0.2
+#系数
+coff: 0.0026
