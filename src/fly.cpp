@@ -18,7 +18,6 @@
 
 namespace sml = boost::sml;
 
-
 namespace
 {
 
@@ -47,6 +46,9 @@ namespace
     {
     };
     struct stop
+    {
+    };
+    struct sleep
     {
     };
 
@@ -101,20 +103,6 @@ namespace
                 }
             };
 
-            // auto is_target = [](cv::VideoCapture cap, cv::point2f *my_point[2]) // my_point[0] 为上一次数据
-            // {
-            //     if (!cap.isOpened())
-            //     {
-            //         ROS_INFO("cap init fail");
-            //         abort();
-            //     }
-            //     cv::Mat img;
-            //     cap >> img;
-            //     color::color_Range(img, img, color::red);
-            //     my_point[0] = my_point[1];
-            //     return color::color_center(img, my_point[1]);
-            // };
-
             //创建action
 
             // action1 初始化
@@ -166,17 +154,6 @@ namespace
                 ROS_INFO("loked!");
             };
 
-            // auto PID_init[](PIDController * my_pid){
-
-            // };
-
-            // auto ret_speed=[](velocity  v1, cv::point2f & my_point[2], PIDController & my_pid)
-            // {
-            //     float setpoint;
-            //     *v1.linear_x = PIDController_Update(my_pid, setpoint, my_point[1].x - my_point[0].x);
-            //     *v1.linear_y = PIDController_Update(my_pid, setpoint, my_point[1].y - my_point[0].y);
-            // };
-
             return make_transition_table(
                 *"idle"_s + event<release> / init = "ready"_s,
                 "ready"_s + event<takeoff>[is_init] / takeoffset = "normal"_s,
@@ -203,6 +180,19 @@ void state_cb(const mavros_msgs::State::ConstPtr &msg)
     current_state = *msg;
 }
 
+void read_PID(const YAML::Node &pid_yaml, PIDController &pid)
+{
+    pid.Kd = pid_yaml["Kd"].as<double>();
+    pid.Ki = pid_yaml["Ki"].as<double>();
+    pid.Kp = pid_yaml["Kp"].as<double>();
+    pid.limMax = pid_yaml["limMax"].as<double>();
+    pid.limMin = pid_yaml["limMin"].as<double>();
+    pid.limMaxInt = pid_yaml["limMaxInt"].as<double>();
+    pid.limMinInt = pid_yaml["limMinInt"].as<double>();
+    pid.T = pid_yaml["T"].as<double>();
+    pid.tau = pid_yaml["tau"].as<double>();
+}
+
 int main(int argc, char **argv)
 {
     using namespace sml;
@@ -215,17 +205,9 @@ int main(int argc, char **argv)
     PIDController mypid_x;
     PIDController mypid_y;
     YAML::Node message = YAML::LoadFile("/home/liuchuangye/catkin_ws/src/sml_test/config/msg.yaml");
-    mypid_x.Ki = message["Ki"].as<double>();
-    mypid_x.Kd = message["Kd"].as<double>();
-    mypid_x.Kp = message["Kp"].as<double>();
-    mypid_x.tau = message["tau"].as<double>();
-    mypid_x.limMax = message["limMax"].as<double>();
-    mypid_x.limMin = message["limMin"].as<double>();
-    mypid_x.limMinInt = message["limMinInt"].as<double>();
-    mypid_x.limMaxInt = message["limMaxInt"].as<double>();
-    mypid_x.T = message["T"].as<double>();
+    read_PID(message, mypid_x);
+    read_PID(message, mypid_y);
     double coff = message["coff"].as<double>();
-    mypid_x = mypid_y;
     print_PID(mypid_x);
     print_PID(mypid_y);
 
@@ -284,7 +266,6 @@ int main(int argc, char **argv)
                     my_velocity.linear_x = 0;
                     sm.process_event(set_speed{});
                     ROS_INFO("found car");
-                    sleep(2);
                     PIDController_Init(mypid_x);
                     PIDController_Init(mypid_y);
                     sm.process_event(track{});
@@ -347,7 +328,6 @@ int main(int argc, char **argv)
             if (ros::Time::now() - time2 > ros::Duration(12.0))
             {
                 ROS_INFO("gonna lock");
-                sleep(5);
                 sm.process_event(lock_{});
                 abort();
             }
