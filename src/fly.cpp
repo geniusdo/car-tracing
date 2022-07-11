@@ -58,6 +58,9 @@ namespace
     struct sleep
     {
     };
+    struct gettime
+    {
+    };
 
     struct fly_test
     {
@@ -161,6 +164,11 @@ namespace
                 ROS_INFO("loked!");
             };
 
+            auto getime = [](ros::Time &time2)
+            {
+                time2 = ros::Time::now();
+            };
+
             // auto set_tf = [](ros::NodeHandle n, tf::TransformBroadcaster broadcaster, position &tf_position)
             // {
 
@@ -175,9 +183,9 @@ namespace
                 "ready"_s + event<takeoff>[is_init] / takeoffset = "normal"_s,
                 "normal"_s + event<set_speed>[is_armed] / setspeed = "normal"_s,
                 "normal"_s + event<track> / [] {} = "tracking"_s,
-                "normal"_s + event<stop> / [] {} = "landing"_s,
+                "normal"_s + event<stop> / []{} = "landing"_s,
                 "tracking"_s + event<set_speed>[is_armed] / setspeed = "tracking"_s,
-                "tracking"_s + event<stop>[is_armed] / [] {} = "landing"_s,
+                "tracking"_s + event<stop>[is_armed] / []{} = "landing"_s,
                 "landing"_s + event<set_speed>[is_armed] / setspeed = "landing"_s,
                 "landing"_s + event<lock_>[is_armed] / lock = X
                 //"normal"_s / lock = X
@@ -226,6 +234,7 @@ int main(int argc, char **argv)
     double coff = message["coff"].as<double>();
     print_PID(mypid_x);
     print_PID(mypid_y);
+    ros::Time time2;
 
     while (!current_state.connected)
     {
@@ -245,7 +254,6 @@ int main(int argc, char **argv)
     cv::Point2f my_point[2];
     sml::sm<fly_test> sm{n, client, my_velocity, vel_sp_pub, current_state};
     auto time1 = ros::Time::now();
-    ros::Time time2;
 
     while (1)
     {
@@ -301,7 +309,7 @@ int main(int argc, char **argv)
             my_point[0] = my_point[1];
             cap >> img;
             color::color_Range(img, img, color::red);
-            if (color::isstopped(0.05, 1, my_point[0], my_point[1], coff))
+            if (color::isstopped(0, 1, my_point[0], my_point[1], coff))
             {
                 ROS_INFO("car is static");
                 time2 = ros::Time::now();
@@ -311,6 +319,7 @@ int main(int argc, char **argv)
             {
                 PIDController_Init(mypid_x);
                 PIDController_Init(mypid_y);
+                time2 = ros::Time::now();
                 sm.process_event(stop{});
             }
             my_velocity.linear_x = PIDController_Update(mypid_x, my_point[1].x, 240, coff);
