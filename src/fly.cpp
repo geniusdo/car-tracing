@@ -15,6 +15,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
+#include <tf/transform_broadcaster.h>
 
 namespace sml = boost::sml;
 
@@ -29,6 +30,12 @@ namespace
         double angular_x = 0;
         double angular_y = 0;
         double angular_z = 0;
+    };
+    struct position
+    {
+        double x = 0;
+        double y = 0;
+        double z = 0;
     };
     struct release
     {
@@ -153,6 +160,15 @@ namespace
                 std::cout << "loked!" << std::endl;
                 ROS_INFO("loked!");
             };
+
+            // auto set_tf = [](ros::NodeHandle n, tf::TransformBroadcaster broadcaster, position &tf_position)
+            // {
+
+            //     // broadcaster.sendTransform(
+            //     //     tf::StampedTransform(
+            //     //         tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(tf_position.x, tf_position.y, tf_position.z)),
+            //     //         ros::Time::now(), "map", "target_position"));
+            // };
 
             return make_transition_table(
                 *"idle"_s + event<release> / init = "ready"_s,
@@ -297,8 +313,8 @@ int main(int argc, char **argv)
                 PIDController_Init(mypid_y);
                 sm.process_event(stop{});
             }
-            my_velocity.linear_x = PIDController_Update(mypid_x, my_point[1].x, 320, coff);
-            my_velocity.linear_y = PIDController_Update(mypid_y, my_point[1].y, 240, coff);
+            my_velocity.linear_x = PIDController_Update(mypid_x, my_point[1].x, 240, coff);
+            my_velocity.linear_y = PIDController_Update(mypid_y, my_point[1].y, 320, coff);
             ROS_INFO("car cord is (%f,%f)", my_point[1].x, my_point[1].y);
             ROS_INFO("giving speed is (%f,%f,%f)", my_velocity.linear_x, my_velocity.linear_y, my_velocity.linear_z);
             sm.process_event(set_speed{});
