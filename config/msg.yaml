@@ -1,9 +1,9 @@
 #PID参数
-Ki: 1
-Kd: 0.5
+Ki: 0
+Kd: 0
 Kp: 5.0
 #Derivative low-pass filter time constant
-tau: 0.02
+tau: 0.025
 #Output limits (pid->out)
 limMin: -1.0
 limMax: 1.0
