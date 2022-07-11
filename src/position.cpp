@@ -25,7 +25,7 @@ int main(int argc, char **argv)
     ros::Subscriber state_sub = n.subscribe<mavros_msgs::State>("mavros/state", 10, state_cb);
     ros::ServiceClient client1 = n.serviceClient<mavros_msgs::CommandBool>("/mavros/cmd/arming");
     ros::ServiceClient client2 = n.serviceClient<mavros_msgs::CommandSetMode>("/mavros/cmd/set_mode");
-    ros::ServiceClient client3 = n.serviceClient<mavros_msgs::CommandSetMode>("/mavros/setpoint_position/set_tf_listen");
+    ros::ServiceClient client3 = n.serviceClient<mavros_msgs::SetTFListen>("/mavros/setpoint_position/set_tf_listen");
     tf::TransformBroadcaster broadcaster;
     ros::Rate rate(20.0);
 
@@ -36,7 +36,7 @@ int main(int argc, char **argv)
     mavros_msgs::CommandBool arm_cmd;
     arm_cmd.request.value = true;
 
-    mavros_msgs::CommandBool tf_listen;
+    mavros_msgs::SetTFListen tf_listen;
     tf_listen.request.value = true;
 
     while (!current_state.connected)
