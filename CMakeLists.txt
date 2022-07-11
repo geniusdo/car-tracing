@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(sml_test)
+project(car-tracing)
 set(CMAKE_CXX_STANDARD 14)
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -221,4 +221,4 @@ endif()
 add_executable(fly src/fly.cpp)
 target_link_libraries(fly ${catkin_LIBRARIES} ${OpenCV_LIBS} /usr/local/lib/libyaml-cpp.so)
 add_executable(position src/position.cpp)
-target_link_libraries(position ${catkin_LIBRARIES} )
+target_link_libraries(position ${catkin_LIBRARIES})
