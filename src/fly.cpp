@@ -228,7 +228,7 @@ int main(int argc, char **argv)
     ros::Rate rate(20.0);
     PIDController mypid_x;
     PIDController mypid_y;
-    YAML::Node message = YAML::LoadFile("/home/liuchuangye/catkin_ws/src/sml_test/config/msg.yaml");
+    YAML::Node message = YAML::LoadFile("../config/msg.yaml");
     read_PID(message, mypid_x);
     read_PID(message, mypid_y);
     double coff = message["coff"].as<double>();

@@ -56,21 +56,34 @@ int main(int argc, char **argv)
     while (1)
     {
         if (ros::Time::now() - time1 < ros::Duration(10))
+        {
             broadcaster.sendTransform(
                 tf::StampedTransform(
                     tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0, 0, 1)),
                     ros::Time::now(), "map", "target_position"));
+        }
 
         if (ros::Time::now() - time1 >= ros::Duration(10) && ros::Time::now() - time1 < ros::Duration(20))
+        {
             broadcaster.sendTransform(
                 tf::StampedTransform(
                     tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(1, 0, 1)),
                     ros::Time::now(), "map", "target_position"));
-        if (ros::Time::now() - time1 >= ros::Duration(20) && ros::Time::now() - time1 < ros::Duration(30))
+        }
+        if(ros::Time::now() - time1 >= ros::Duration(20) && ros::Time::now() - time1 < ros::Duration(25))
+        {
+            ROS_INFO("shut");
+            //test here
+            // broadcaster.sendTransform(
+            //     tf::StampedTransform(
+            //         tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(1, 0, 1)),
+            //         ros::Time::now(), "map", "target_position"));
+        }
+        if (ros::Time::now() - time1 >= ros::Duration(25) && ros::Time::now() - time1 < ros::Duration(30))
         {
             broadcaster.sendTransform(
                 tf::StampedTransform(
-                    tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0, 0, 0)),
+                    tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0, 0, -0.2)),
                     ros::Time::now(), "map", "target_position"));
         }
         if (ros::Time::now() - time1 >= ros::Duration(30))
