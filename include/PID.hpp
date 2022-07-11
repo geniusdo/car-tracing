@@ -7,9 +7,6 @@ typedef struct
 	double Ki;
 	double Kd;
 
-	/* Derivative low-pass filter time constant */
-	double tau;
-
 	/* Output limits */
 	double limMin;
 	double limMax;
