@@ -255,7 +255,6 @@ void read_PID(const YAML::Node &pid_yaml, PIDController &pid)
     pid.limMaxInt = pid_yaml["limMaxInt"].as<double>();
     pid.limMinInt = pid_yaml["limMinInt"].as<double>();
     pid.T = pid_yaml["T"].as<double>();
-    pid.tau = pid_yaml["tau"].as<double>();
 }
 
 int main(int argc, char **argv)

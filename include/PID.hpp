@@ -1,3 +1,4 @@
+#include <iostream>
 typedef struct
 {
 
@@ -44,13 +45,13 @@ void PIDController_Init(PIDController &pid)
 	pid.out = 0.0f;
 }
 
-float PIDController_Update(PIDController &pid, float setpoint, float measurement,double coff)
+float PIDController_Update(PIDController &pid, float setpoint, float measurement, double coff)
 {
 
 	/*
 	 * Error signal
 	 */
-	double error = coff*(setpoint - measurement);
+	double error = coff * (setpoint - measurement);
 
 	/*
 	 * Proportional
@@ -78,9 +79,7 @@ float PIDController_Update(PIDController &pid, float setpoint, float measurement
 	 * Derivative (band-limited differentiator)
 	 */
 
-	pid.differentiator = -(2.0f * pid.Kd * coff*(measurement - pid.prevMeasurement) /* Note: derivative on measurement, therefore minus sign in front of equation! */
-							+ (2.0f * pid.tau - pid.T) * pid.differentiator) /
-						  (2.0f * pid.tau + pid.T);
+	pid.differentiator = -(pid.Kd * coff * (measurement - pid.prevMeasurement)) / pid.T; /* Note: derivative on measurement, therefore minus sign in front of equation! */
 
 	/*
 	 * Compute output and apply limits
@@ -108,5 +107,7 @@ float PIDController_Update(PIDController &pid, float setpoint, float measurement
 
 void print_PID(const PIDController &pid)
 {
-	std::cout<<"Ki="<<pid.Ki<<"\t"<<"Kd="<<pid.Kd<<"\t"<<"Kp="<<pid.Kp<<"\t"<<std::endl;
+	std::cout << "Ki=" << pid.Ki << "\t"
+			  << "Kd=" << pid.Kd << "\t"
+			  << "Kp=" << pid.Kp << "\t" << std::endl;
 }
