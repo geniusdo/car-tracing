@@ -245,16 +245,30 @@ void state_cb(const mavros_msgs::State::ConstPtr &msg)
     current_state = *msg;
 }
 
-void read_PID(const YAML::Node &pid_yaml, PIDController &pid)
+void read_PID(const YAML::Node &pid_yaml, PIDController &pid, int i)
 {
-    pid.Kd = pid_yaml["Kd"].as<double>();
-    pid.Ki = pid_yaml["Ki"].as<double>();
-    pid.Kp = pid_yaml["Kp"].as<double>();
-    pid.limMax = pid_yaml["limMax"].as<double>();
-    pid.limMin = pid_yaml["limMin"].as<double>();
-    pid.limMaxInt = pid_yaml["limMaxInt"].as<double>();
-    pid.limMinInt = pid_yaml["limMinInt"].as<double>();
-    pid.T = pid_yaml["T"].as<double>();
+    if (i = 0) // x,y
+    {
+        pid.Kd = pid_yaml["Kd"].as<double>();
+        pid.Ki = pid_yaml["Ki"].as<double>();
+        pid.Kp = pid_yaml["Kp"].as<double>();
+        pid.limMax = pid_yaml["limMax"].as<double>();
+        pid.limMin = pid_yaml["limMin"].as<double>();
+        pid.limMaxInt = pid_yaml["limMaxInt"].as<double>();
+        pid.limMinInt = pid_yaml["limMinInt"].as<double>();
+        pid.T = pid_yaml["T"].as<double>();
+    }
+    if (i = 1) // z yaw
+    {
+        pid.Kd = pid_yaml["Kd_"].as<double>();
+        pid.Ki = pid_yaml["Ki_"].as<double>();
+        pid.Kp = pid_yaml["Kp_"].as<double>();
+        pid.limMax = pid_yaml["limMax_"].as<double>();
+        pid.limMin = pid_yaml["limMin_"].as<double>();
+        pid.limMaxInt = pid_yaml["limMaxInt_"].as<double>();
+        pid.limMinInt = pid_yaml["limMinInt_"].as<double>();
+        pid.T = pid_yaml["T"].as<double>();
+    }
 }
 
 int main(int argc, char **argv)
@@ -271,8 +285,10 @@ int main(int argc, char **argv)
     PIDController mypid_z;
     PIDController mypid_z_angular;
     YAML::Node message = YAML::LoadFile("../config/msg.yaml");
-    read_PID(message, mypid_x);
-    read_PID(message, mypid_y);
+    read_PID(message, mypid_x, 0);
+    read_PID(message, mypid_y, 0);
+    read_PID(message, mypid_z, 1);
+    read_PID(message, mypid_z_angular, 1);
     double coff = message["coff"].as<double>();
     print_PID(mypid_x);
     print_PID(mypid_y);
@@ -380,7 +396,7 @@ int main(int argc, char **argv)
             }
             my_velocity.linear_x = PIDController_Update(mypid_x, my_point[1].x, 240, coff);
             my_velocity.linear_y = PIDController_Update(mypid_y, my_point[1].y, 320, coff);
-            my_velocity.linear_z = PIDController_Update(mypid_z, transform.getOrigin().z(), 1.0, coff);
+            my_velocity.linear_z = PIDController_Update(mypid_z, transform.getOrigin().z(), 1.0, 1);
             ROS_INFO("car cord is (%f,%f)", my_point[1].x, my_point[1].y);
             ROS_INFO("giving speed is (%f,%f,%f)", my_velocity.linear_x, my_velocity.linear_y, my_velocity.linear_z);
             sm.process_event(set_speed{});
