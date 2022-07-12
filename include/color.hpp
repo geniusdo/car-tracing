@@ -58,10 +58,11 @@ namespace color
         }
         case red:
         {
-            // Mat imgThresholded1, imgThresholded2;
-            inRange(imghsv, cv::Scalar(0, 150, 150), cv::Scalar(30, 255, 255), imgThresholded); //红色
-            // add(imgThresholded1, imgThresholded2, imgThresholded, Mat(), CV_64FC1);
-            // cv::inRange(imghsv, cv::Scalar(0, 0, 255), cv::Scalar(90, 250, 255), imgThresholded);
+            cv::Mat imgThresholded1, imgThresholded2;
+            cv::inRange(imghsv, cv::Scalar(146, 100, 90), cv::Scalar(180, 255, 200), imgThresholded1); //红色
+            cv::inRange(imghsv, cv::Scalar(0, 50, 150), cv::Scalar(30, 150, 200), imgThresholded2);
+            add(imgThresholded1, imgThresholded2, imgThresholded);
+
             break;
         }
         case black:
@@ -91,7 +92,7 @@ namespace color
         }
         }
     }
-    bool color_center(cv::InputArray img_two, 
+    bool color_center(cv::InputArray img_two,
                       cv::Point2f &photo_center)
     {
         std::vector<std::vector<cv::Point>> contours;
@@ -141,10 +142,10 @@ namespace color
             }
         }
     }
-    bool isstopped(double time,double limvel, const cv::Point2f &pre_cen, const cv::Point2f &cen,double coff)
+    bool isstopped(double time, double limvel, const cv::Point2f &pre_cen, const cv::Point2f &cen, double coff)
     {
-        double x_sub = (pre_cen.x - cen.x)*coff;
-        double y_sub = (pre_cen.y - cen.y)*coff;
+        double x_sub = (pre_cen.x - cen.x) * coff;
+        double y_sub = (pre_cen.y - cen.y) * coff;
         double diatance = sqrt(pow(x_sub, 2) + pow(y_sub, 2));
         if (diatance < limvel * time)
         {

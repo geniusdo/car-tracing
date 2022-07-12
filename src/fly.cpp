@@ -359,6 +359,8 @@ int main(int argc, char **argv)
                 time2 = ros::Time::now();
                 sm.process_event(stop{});
             }
+            target.set(5, 0, 1);
+            sm.process_event(set_position{});
         }
         else if (sm.is("tracking"_s))
         {
