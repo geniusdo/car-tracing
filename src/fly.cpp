@@ -6,8 +6,8 @@
 #include "mavros_msgs/CommandBool.h"
 #include "mavros_msgs/CommandTakeoffLocal.h"
 #include "mavros_msgs/SetTFListen.h"
-#include <mavros_msgs/State.h>
 #include <mavros_msgs/PositionTarget.h>
+#include <mavros_msgs/State.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <image_transport/image_transport.h>
 #include <unistd.h>
@@ -22,42 +22,36 @@
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 
+#define MOVE_POSITION 3576
+#define SET_SPEED 3527
+#define SET_SPEED_FIX_Z 3555
+#define TAKEOFF_FIX_SPEED 3551
+
+
 namespace sml = boost::sml;
 
 namespace
 {
 
-    struct velocity
+    struct target
     {
         // FLU-> NED 转换
         double linear_x = 0;
         double linear_y = 0;
         double linear_z = 0;
-        double angular_x = 0;
-        double angular_y = 0;
-        double angular_z = 0;
-        int type_mask = 31;
-        void set(double a, double b, double c, double d, double e, double f, int mask)
+        double position_x = 0;
+        double position_y = 0;
+        double position_z = 0;
+        uint type_mask = 0;
+        void set(double a, double b, double c, double d, double e, double f, uint mask)
         {
             this->linear_x = a;
             this->linear_y = b;
             this->linear_z = c;
-            this->angular_x = d;
-            this->angular_y = e;
-            this->angular_z = f;
+            this->position_x = d;
+            this->position_y = e;
+            this->position_z = f;
             this->type_mask = mask;
-        }
-    };
-    struct position
-    {
-        double x = 0;
-        double y = 0;
-        double z = 0;
-        void set(double a, double b, double c)
-        {
-            this->x = a;
-            this->y = b;
-            this->z = c;
         }
     };
     struct release
@@ -87,7 +81,7 @@ namespace
     struct set_position
     {
     };
-    struct quittf
+    struct lost_target
     {
     };
 
@@ -112,8 +106,8 @@ namespace
                 return false;
             };
 
-            // guard2 判断是否能够起飞
-            auto is_armed = [](mavros_msgs::State &current_state)
+            // guard2 判断是否能够起飞 若不能则尝试修复
+            auto is_armed = [](ros::NodeHandle n, mavros_msgs::State &current_state, ros::ServiceClient &client)
             {
                 if (ros::ok() && current_state.armed && current_state.mode == "OFFBOARD")
                     // if (ros::ok() && current_state.mode == "OFFBOARD")
@@ -136,6 +130,11 @@ namespace
                     if (current_state.mode != "OFFBOARD")
                     {
                         ROS_INFO("not offboard");
+                        mavros_msgs::CommandSetMode offb_set_mode;
+                        offb_set_mode.request.base_mode = 0;
+                        offb_set_mode.request.custom_mode = "OFFBOARD";
+                        client = n.serviceClient<mavros_msgs::CommandSetMode>("/mavros/cmd/set_mode");
+                        client.call(offb_set_mode);
                     }
                     ROS_INFO("mode guard faild");
                     return false;
@@ -160,11 +159,6 @@ namespace
                 client = n.serviceClient<mavros_msgs::CommandSetMode>("/mavros/cmd/set_mode");
                 client.call(offb_set_mode);
 
-                // mavros_msgs::SetTFListen tf_listen;
-                // tf_listen.request.value = true;
-                // client = n.serviceClient<mavros_msgs::SetTFListen>("/mavros/setpoint_position/set_tf_listen");
-                // client.call(tf_listen);
-
                 mavros_msgs::CommandBool arm_cmd;
                 arm_cmd.request.value = true;
                 client = n.serviceClient<mavros_msgs::CommandBool>("/mavros/cmd/arming");
@@ -172,21 +166,23 @@ namespace
             };
 
             // action3 设置速度
-            auto setspeed = [](velocity &v1, mavros_msgs::PositionTarget target_speed, ros::Publisher vel_sp_pub)
+            auto SetAction = [](target &v1, ros::Publisher vel_sp_pub)
             {
-                geometry_msgs::Vector3 my_velocity;
-                my_velocity.x = v1.linear_x;
-                my_velocity.y = v1.linear_y;
-                my_velocity.z = v1.linear_z;
-
+                mavros_msgs::PositionTarget target_speed;
+                geometry_msgs::Vector3 myvelocity;
+                geometry_msgs::Point myposition;
+                myvelocity.x = v1.linear_x;
+                myvelocity.y = v1.linear_y;
+                myvelocity.z = v1.linear_z;
+                myposition.x = v1.position_x;
+                myposition.y = v1.position_y;
+                myposition.z = v1.position_z;
                 target_speed.header.stamp = ros::Time::now();
-
                 target_speed.coordinate_frame = 8;
                 target_speed.type_mask = v1.type_mask;
-                target_speed.velocity = my_velocity;
-
+                target_speed.velocity = myvelocity;
+                target_speed.position = myposition;
                 vel_sp_pub.publish(target_speed);
-                std::cout << "setspeed done" << std::endl;
                 ROS_INFO("setspeed done");
             };
 
@@ -201,59 +197,15 @@ namespace
                 ROS_INFO("loked!");
             };
 
-            auto setposition = [](position &target_pos, tf::TransformBroadcaster broadcaster)
-            {
-                broadcaster.sendTransform(
-                    tf::StampedTransform(
-                        tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(target_pos.x, target_pos.y, target_pos.z)),
-                        ros::Time::now(), "map", "target_position"));
-                ROS_INFO("fly to (%f, %f, %f)", target_pos.x, target_pos.y, target_pos.z);
-            };
-
-            //退出发布tf
-            // auto quit_tf = [](ros::NodeHandle n, ros::ServiceClient client)
-            // {
-            //     if (i == 0)
-            //     {
-            //         mavros_msgs::SetTFListen tf_listen;
-            //         tf_listen.request.value = false;
-            //         client = n.serviceClient<mavros_msgs::SetTFListen>("/mavros/setpoint_position/set_tf_listen");
-            //         client.call(tf_listen);
-            //     }
-            //     i++;
-            // };
-
-            auto open_tf = [](ros::NodeHandle n, ros::ServiceClient &client)
-            {
-                mavros_msgs::SetTFListen tf_listen;
-                tf_listen.request.value = true;
-                client = n.serviceClient<mavros_msgs::SetTFListen>("/mavros/setpoint_position/set_tf_listen");
-                client.call(tf_listen);
-            };
-
-            // auto set_tf = [](ros::NodeHandle n, tf::TransformBroadcaster broadcaster, position &tf_position)
-            // {
-
-            //     // broadcaster.sendTransform(
-            //     //     tf::StampedTransform(
-            //     //         tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(tf_position.x, tf_position.y, tf_position.z)),
-            //     //         ros::Time::now(), "map", "target_position"));
-            // };
-
             return make_transition_table(
                 *"idle"_s + event<release> / init = "ready"_s,
-                //在takeoffset中开启tf监听
                 "ready"_s + event<takeoff>[is_init] / takeoffset = "normal"_s,
-                "normal"_s + event<set_speed>[is_armed] / setspeed = "normal"_s,
-                "normal"_s + event<set_position>[is_armed] / setposition = "normal"_s,
-                //进入track模式退出tf监听
-                "normal"_s + event<quittf> / [] {} = "normal"_s,
-                "normal"_s + event<track> / [] {} = "tracking"_s,
+                "normal"_s + event<set_speed>[is_armed] / SetAction = "normal"_s,
+                "normal"_s + event<track>[is_armed] / [] {} = "tracking"_s,
                 "normal"_s + event<stop> / [] {} = "landing"_s,
-                "tracking"_s + event<set_speed>[is_armed] / setspeed = "tracking"_s,
-                "landing"_s + event<set_position>[is_armed] / setposition = "landing"_s,
+                "tracking"_s + event<set_speed>[is_armed] / SetAction = "tracking"_s,
                 "tracking"_s + event<stop>[is_armed] / [] {} = "landing"_s,
-                "landing"_s + event<set_speed>[is_armed] / setspeed = "landing"_s,
+                "landing"_s + event<set_speed>[is_armed] / SetAction = "landing"_s,
                 "landing"_s + event<lock_>[is_armed] / lock = X);
         };
     };
@@ -300,9 +252,9 @@ int main(int argc, char **argv)
     int j = 0;
     ros::init(argc, argv, "simple_fly");
     ros::NodeHandle n;
-    ros::Publisher vel_sp_pub = n.advertise<mavros_msgs::PositionTarget>("/mavros/setpoint_raw/target_local", 10);
+    ros::Publisher vel_sp_pub = n.advertise<mavros_msgs::PositionTarget>("/mavros/setpoint_raw/local", 10);
     ros::Subscriber state_sub = n.subscribe<mavros_msgs::State>("mavros/state", 10, state_cb);
-    ros::Rate rate(15.0);
+    ros::Rate rate(10.0);
     PIDController mypid_x;
     PIDController mypid_y;
     PIDController mypid_z;
@@ -325,10 +277,8 @@ int main(int argc, char **argv)
     }
     // ros::ServiceClient set_mode_client = n.serviceClient<mavros_msgs::CommandSetMode>("/mavros/cmd/set_mode");
     // ros::ServiceClient arming_client = n.serviceClient<mavros_msgs::CommandBool>("/mavros/cmd/arming");
-    velocity my_velocity;
-    position target;
+    target my_target;
     ros::ServiceClient client;
-    tf::TransformListener listener;
     // image_transport::ImageTransport it(n);
     // image_transport::Publisher pub = it.advertise("camera/image", 1);
     cv::VideoCapture cap;
@@ -337,7 +287,7 @@ int main(int argc, char **argv)
     cap >> img;
     color::color_Range(img, img, color::red);
     cv::Point2f my_point[2];
-    sml::sm<fly_test> sm{n, client, my_velocity, vel_sp_pub, current_state, target, listener};
+    sml::sm<fly_test> sm{n, client, my_target, vel_sp_pub, current_state};
     auto time1 = ros::Time::now();
 
     while (1)
@@ -365,11 +315,11 @@ int main(int argc, char **argv)
             }
             if (ros::Time::now() - time1 >= ros::Duration(5.0) && ros::Time::now() - time1 < ros::Duration(8.6))
             {
-                my_velocity.set(0, 0, 0.5, 0, 0, 0, 3551);// 
+                my_target.set(0, 0, 0, 0, 0, 0.8, MOVE_POSITION);
                 sm.process_event(set_speed{});
             }
 
-            if (ros::Time::now() - time1 >= ros::Duration(8.6))
+            if (ros::Time::now() - time1 >= ros::Duration(8.61))
             {
 
                 cap >> img;
@@ -381,7 +331,7 @@ int main(int argc, char **argv)
                     PIDController_Init(mypid_y);
                     sm.process_event(track{});
                 }
-                my_velocity.set(0.3, 0, 0, 0, 0, 0,3575);
+                my_target.set(0.3, 0, 0, 0, 0, 0.8, SET_SPEED_FIX_Z);
                 sm.process_event(set_speed{});
             }
             if (ros::Time::now() - time1 >= ros::Duration(18.6))
@@ -394,24 +344,10 @@ int main(int argc, char **argv)
         else if (sm.is("tracking"_s))
         {
             ROS_INFO("tracking!");
-            //监听tf
-            // tf::TransformListener listener;
-            // tf::StampedTransform transform;
-            // try
-            // {
-            //     listener.lookupTransform("map", "base_link", ros::Time(0), transform);
-            // }
-            // catch (tf::TransformException &ex)
-            // {
-            //     ROS_ERROR("%s", ex.what());
-            //     continue;
-            // }
-            //角度信息 待加
-
             my_point[0] = my_point[1];
             cap >> img;
             color::color_Range(img, img, color::red);
-            if (color::isstopped(0, 1, my_point[0], my_point[1], coff))
+            if (color::isstopped(5, 1, my_point[0], my_point[1], coff))
             {
                 ROS_INFO("car is static");
                 time2 = ros::Time::now();
@@ -428,13 +364,12 @@ int main(int argc, char **argv)
                 }
                 j++;
             }
-            my_velocity.linear_x = -PIDController_Update(mypid_y, my_point[1].y, 240, coff);
-            my_velocity.linear_y = -PIDController_Update(mypid_x, my_point[1].x, 320, coff);
-            my_velocity.linear_z = 0.0;
-            my_velocity.type_mask=3559;
-            // my_velocity.linear_z = PIDController_Update(mypid_z, transform.getOrigin().z(), 1.0, 1);
+            my_target.set(-PIDController_Update(mypid_y, my_point[1].y, 240, coff),
+                          -PIDController_Update(mypid_x, my_point[1].x, 320, coff),
+                          0, 0, 0, 0.8, SET_SPEED_FIX_Z);
             ROS_INFO("car cord is (%f,%f)", my_point[1].x, my_point[1].y);
-            ROS_INFO("giving speed is (%f,%f,%f)", my_velocity.linear_x, my_velocity.linear_y, my_velocity.linear_z);
+            ROS_INFO("giving speed is (%f,%f,%f)", my_target.linear_x, my_target.linear_y, my_target.linear_z);
+
             sm.process_event(set_speed{});
         }
         else if (sm.is("landing"_s))
@@ -444,7 +379,7 @@ int main(int argc, char **argv)
             if (ros::Time::now() - time2 <= ros::Duration(6.0))
             {
                 ROS_INFO("TEST");
-                my_velocity.set(0, 0, -0.2, 0, 0, 0,3551);
+                my_target.set(0, 0, -0.2, 0, 0, 0, SET_SPEED);
                 sm.process_event(set_speed{});
             }
 
