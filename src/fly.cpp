@@ -7,6 +7,7 @@
 #include "mavros_msgs/CommandTakeoffLocal.h"
 #include "mavros_msgs/SetTFListen.h"
 #include <mavros_msgs/State.h>
+#include <mavros_msgs/PositionTarget.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <image_transport/image_transport.h>
 #include <unistd.h>
@@ -28,13 +29,15 @@ namespace
 
     struct velocity
     {
+        // FLU-> NED 转换
         double linear_x = 0;
         double linear_y = 0;
         double linear_z = 0;
         double angular_x = 0;
         double angular_y = 0;
         double angular_z = 0;
-        void set(double a, double b, double c, double d, double e, double f)
+        int type_mask = 31;
+        void set(double a, double b, double c, double d, double e, double f, int mask)
         {
             this->linear_x = a;
             this->linear_y = b;
@@ -42,6 +45,7 @@ namespace
             this->angular_x = d;
             this->angular_y = e;
             this->angular_z = f;
+            this->type_mask = mask;
         }
     };
     struct position
@@ -168,16 +172,20 @@ namespace
             };
 
             // action3 设置速度
-            auto setspeed = [](velocity &v1, geometry_msgs::TwistStamped vs, ros::Publisher vel_sp_pub)
+            auto setspeed = [](velocity &v1, mavros_msgs::PositionTarget target_speed, ros::Publisher vel_sp_pub)
             {
-                vs.twist.linear.x = v1.linear_x;
-                vs.twist.linear.y = v1.linear_y;
-                vs.twist.linear.z = v1.linear_z;
-                vs.twist.angular.x = v1.angular_x;
-                vs.twist.angular.y = v1.angular_y;
-                vs.twist.angular.z = v1.angular_z;
-                vs.header.stamp = ros::Time::now();
-                vel_sp_pub.publish(vs);
+                geometry_msgs::Vector3 my_velocity;
+                my_velocity.x = v1.linear_x;
+                my_velocity.y = v1.linear_y;
+                my_velocity.z = v1.linear_z;
+
+                target_speed.header.stamp = ros::Time::now();
+
+                target_speed.coordinate_frame = 8;
+                target_speed.type_mask = v1.type_mask;
+                target_speed.velocity = my_velocity;
+
+                vel_sp_pub.publish(target_speed);
                 std::cout << "setspeed done" << std::endl;
                 ROS_INFO("setspeed done");
             };
@@ -292,7 +300,7 @@ int main(int argc, char **argv)
     int j = 0;
     ros::init(argc, argv, "simple_fly");
     ros::NodeHandle n;
-    ros::Publisher vel_sp_pub = n.advertise<geometry_msgs::TwistStamped>("/mavros/setpoint_velocity/cmd_vel", 10);
+    ros::Publisher vel_sp_pub = n.advertise<mavros_msgs::PositionTarget>("/mavros/setpoint_raw/target_local", 10);
     ros::Subscriber state_sub = n.subscribe<mavros_msgs::State>("mavros/state", 10, state_cb);
     ros::Rate rate(15.0);
     PIDController mypid_x;
@@ -357,7 +365,7 @@ int main(int argc, char **argv)
             }
             if (ros::Time::now() - time1 >= ros::Duration(5.0) && ros::Time::now() - time1 < ros::Duration(8.6))
             {
-                my_velocity.set(0, 0, 0.5, 0, 0, 0);
+                my_velocity.set(0, 0, 0.5, 0, 0, 0, 3551);// 
                 sm.process_event(set_speed{});
             }
 
@@ -373,7 +381,7 @@ int main(int argc, char **argv)
                     PIDController_Init(mypid_y);
                     sm.process_event(track{});
                 }
-                my_velocity.set(0.3, 0, 0, 0, 0, 0);
+                my_velocity.set(0.3, 0, 0, 0, 0, 0,3575);
                 sm.process_event(set_speed{});
             }
             if (ros::Time::now() - time1 >= ros::Duration(18.6))
@@ -423,6 +431,7 @@ int main(int argc, char **argv)
             my_velocity.linear_x = -PIDController_Update(mypid_y, my_point[1].y, 240, coff);
             my_velocity.linear_y = -PIDController_Update(mypid_x, my_point[1].x, 320, coff);
             my_velocity.linear_z = 0.0;
+            my_velocity.type_mask=3559;
             // my_velocity.linear_z = PIDController_Update(mypid_z, transform.getOrigin().z(), 1.0, 1);
             ROS_INFO("car cord is (%f,%f)", my_point[1].x, my_point[1].y);
             ROS_INFO("giving speed is (%f,%f,%f)", my_velocity.linear_x, my_velocity.linear_y, my_velocity.linear_z);
@@ -435,7 +444,7 @@ int main(int argc, char **argv)
             if (ros::Time::now() - time2 <= ros::Duration(6.0))
             {
                 ROS_INFO("TEST");
-                my_velocity.set(0, 0, -0.2, 0, 0, 0);
+                my_velocity.set(0, 0, -0.2, 0, 0, 0,3551);
                 sm.process_event(set_speed{});
             }
 

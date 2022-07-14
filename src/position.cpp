@@ -5,6 +5,7 @@
 #include "mavros_msgs/CommandTakeoffLocal.h"
 #include "mavros_msgs/SetTFListen.h"
 #include <mavros_msgs/State.h>
+#include <mavros_msgs/PositionTarget.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <unistd.h>
 #include <tf/transform_broadcaster.h>
