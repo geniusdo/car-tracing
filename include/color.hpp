@@ -59,8 +59,8 @@ namespace color
         case red:
         {
             cv::Mat imgThresholded1, imgThresholded2;
-            cv::inRange(imghsv, cv::Scalar(146, 100, 90), cv::Scalar(180, 255, 200), imgThresholded1); //红色
-            cv::inRange(imghsv, cv::Scalar(0, 50, 150), cv::Scalar(30, 150, 200), imgThresholded2);
+            cv::inRange(imghsv, cv::Scalar(0, 150, 150), cv::Scalar(30, 200, 200), imgThresholded1); //红色
+            cv::inRange(imghsv, cv::Scalar(146, 100, 90), cv::Scalar(180, 255, 150), imgThresholded2);
             add(imgThresholded1, imgThresholded2, imgThresholded);
 
             break;

@@ -8,6 +8,7 @@
 #include "mavros_msgs/SetTFListen.h"
 #include <mavros_msgs/State.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <image_transport/image_transport.h>
 #include <unistd.h>
 #include "../include/color.hpp"
 #include "../include/PID.hpp"
@@ -16,6 +17,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
+//#include <cv_bridge/cv_bridge.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 
@@ -32,6 +34,15 @@ namespace
         double angular_x = 0;
         double angular_y = 0;
         double angular_z = 0;
+        void set(double a, double b, double c, double d, double e, double f)
+        {
+            this->linear_x = a;
+            this->linear_y = b;
+            this->linear_z = c;
+            this->angular_x = d;
+            this->angular_y = e;
+            this->angular_z = f;
+        }
     };
     struct position
     {
@@ -70,6 +81,9 @@ namespace
     {
     };
     struct set_position
+    {
+    };
+    struct quittf
     {
     };
 
@@ -142,15 +156,15 @@ namespace
                 client = n.serviceClient<mavros_msgs::CommandSetMode>("/mavros/cmd/set_mode");
                 client.call(offb_set_mode);
 
+                // mavros_msgs::SetTFListen tf_listen;
+                // tf_listen.request.value = true;
+                // client = n.serviceClient<mavros_msgs::SetTFListen>("/mavros/setpoint_position/set_tf_listen");
+                // client.call(tf_listen);
+
                 mavros_msgs::CommandBool arm_cmd;
                 arm_cmd.request.value = true;
                 client = n.serviceClient<mavros_msgs::CommandBool>("/mavros/cmd/arming");
                 client.call(arm_cmd);
-
-                mavros_msgs::SetTFListen tf_listen;
-                tf_listen.request.value = true;
-                client = n.serviceClient<mavros_msgs::SetTFListen>("/mavros/setpoint_position/set_tf_listen");
-                client.call(tf_listen);
             };
 
             // action3 设置速度
@@ -189,15 +203,19 @@ namespace
             };
 
             //退出发布tf
-            auto quit_tf = [](ros::NodeHandle n, ros::ServiceClient client)
-            {
-                mavros_msgs::SetTFListen tf_listen;
-                tf_listen.request.value = false;
-                client = n.serviceClient<mavros_msgs::SetTFListen>("/mavros/setpoint_position/set_tf_listen");
-                client.call(tf_listen);
-            };
+            // auto quit_tf = [](ros::NodeHandle n, ros::ServiceClient client)
+            // {
+            //     if (i == 0)
+            //     {
+            //         mavros_msgs::SetTFListen tf_listen;
+            //         tf_listen.request.value = false;
+            //         client = n.serviceClient<mavros_msgs::SetTFListen>("/mavros/setpoint_position/set_tf_listen");
+            //         client.call(tf_listen);
+            //     }
+            //     i++;
+            // };
 
-            auto open_tf = [](ros::NodeHandle n, ros::ServiceClient client)
+            auto open_tf = [](ros::NodeHandle n, ros::ServiceClient &client)
             {
                 mavros_msgs::SetTFListen tf_listen;
                 tf_listen.request.value = true;
@@ -221,17 +239,14 @@ namespace
                 "normal"_s + event<set_speed>[is_armed] / setspeed = "normal"_s,
                 "normal"_s + event<set_position>[is_armed] / setposition = "normal"_s,
                 //进入track模式退出tf监听
-                "normal"_s + event<track> / quit_tf = "tracking"_s,
+                "normal"_s + event<quittf> / [] {} = "normal"_s,
+                "normal"_s + event<track> / [] {} = "tracking"_s,
                 "normal"_s + event<stop> / [] {} = "landing"_s,
                 "tracking"_s + event<set_speed>[is_armed] / setspeed = "tracking"_s,
-                "tracking"_s + event<set_position>[is_armed] / setposition = "tracking"_s,
-                "tracking"_s + event<stop>[is_armed] / open_tf = "landing"_s,
+                "landing"_s + event<set_position>[is_armed] / setposition = "landing"_s,
+                "tracking"_s + event<stop>[is_armed] / [] {} = "landing"_s,
                 "landing"_s + event<set_speed>[is_armed] / setspeed = "landing"_s,
-                "landing"_s + event<lock_>[is_armed] / (quit_tf, lock) = X
-                //"normal"_s / lock = X
-                //"s1"_s + event<e2>/[]{} = X
-                //"s2"_s+event<e2>[is_armed]/setspeed()
-            );
+                "landing"_s + event<lock_>[is_armed] / lock = X);
         };
     };
 };
@@ -247,7 +262,7 @@ void state_cb(const mavros_msgs::State::ConstPtr &msg)
 
 void read_PID(const YAML::Node &pid_yaml, PIDController &pid, int i)
 {
-    if (i = 0) // x,y
+    if (i == 0) // x,y
     {
         pid.Kd = pid_yaml["Kd"].as<double>();
         pid.Ki = pid_yaml["Ki"].as<double>();
@@ -258,7 +273,7 @@ void read_PID(const YAML::Node &pid_yaml, PIDController &pid, int i)
         pid.limMinInt = pid_yaml["limMinInt"].as<double>();
         pid.T = pid_yaml["T"].as<double>();
     }
-    if (i = 1) // z yaw
+    if (i == 1) // z yaw
     {
         pid.Kd = pid_yaml["Kd_"].as<double>();
         pid.Ki = pid_yaml["Ki_"].as<double>();
@@ -274,17 +289,17 @@ void read_PID(const YAML::Node &pid_yaml, PIDController &pid, int i)
 int main(int argc, char **argv)
 {
     using namespace sml;
-
+    int j = 0;
     ros::init(argc, argv, "simple_fly");
     ros::NodeHandle n;
     ros::Publisher vel_sp_pub = n.advertise<geometry_msgs::TwistStamped>("/mavros/setpoint_velocity/cmd_vel", 10);
     ros::Subscriber state_sub = n.subscribe<mavros_msgs::State>("mavros/state", 10, state_cb);
-    ros::Rate rate(20.0);
+    ros::Rate rate(15.0);
     PIDController mypid_x;
     PIDController mypid_y;
     PIDController mypid_z;
     PIDController mypid_z_angular;
-    YAML::Node message = YAML::LoadFile("../config/msg.yaml");
+    YAML::Node message = YAML::LoadFile("/home/drone/drones/whu_simple_fly/src/car-tracing/config/msg.yaml");
     read_PID(message, mypid_x, 0);
     read_PID(message, mypid_y, 0);
     read_PID(message, mypid_z, 1);
@@ -306,6 +321,8 @@ int main(int argc, char **argv)
     position target;
     ros::ServiceClient client;
     tf::TransformListener listener;
+    // image_transport::ImageTransport it(n);
+    // image_transport::Publisher pub = it.advertise("camera/image", 1);
     cv::VideoCapture cap;
     cap.open(0, cv::CAP_V4L2);
     cv::Mat img;
@@ -317,6 +334,9 @@ int main(int argc, char **argv)
 
     while (1)
     {
+
+        // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img).toImageMsg();
+        // pub.publish(msg);
         if (sm.is("idle"_s))
         {
             sm.process_event(release{});
@@ -331,18 +351,19 @@ int main(int argc, char **argv)
         //起飞->寻车->退出
         else if (sm.is("normal"_s))
         {
-            if (ros::Time::now() - time1 < ros::Duration(2.0))
+            if (ros::Time::now() - time1 < ros::Duration(5.0))
             {
                 // wait, do nothing
             }
-            if (ros::Time::now() - time1 >= ros::Duration(2.0) && ros::Time::now() - time1 < ros::Duration(3.0))
+            if (ros::Time::now() - time1 >= ros::Duration(5.0) && ros::Time::now() - time1 < ros::Duration(8.6))
             {
-                target.set(0, 0, 1);
-                sm.process_event(set_position{});
+                my_velocity.set(0, 0, 0.5, 0, 0, 0);
+                sm.process_event(set_speed{});
             }
 
-            if (ros::Time::now() - time1 >= ros::Duration(2.0))
+            if (ros::Time::now() - time1 >= ros::Duration(8.6))
             {
+
                 cap >> img;
                 color::color_Range(img, img, color::red);
                 if (color::color_center(img, my_point[1]))
@@ -352,32 +373,31 @@ int main(int argc, char **argv)
                     PIDController_Init(mypid_y);
                     sm.process_event(track{});
                 }
+                my_velocity.set(0.3, 0, 0, 0, 0, 0);
+                sm.process_event(set_speed{});
             }
-            if (ros::Time::now() - time1 >= ros::Duration(10.0))
+            if (ros::Time::now() - time1 >= ros::Duration(18.6))
             {
                 ROS_INFO("no");
                 time2 = ros::Time::now();
                 sm.process_event(stop{});
             }
-            target.set(5, 0, 1);
-            sm.process_event(set_position{});
         }
         else if (sm.is("tracking"_s))
         {
             ROS_INFO("tracking!");
             //监听tf
-            tf::TransformListener listener;
-            tf::StampedTransform transform;
-            try
-            {
-                listener.waitForTransform("map", "base_link", ros::Time(0), ros::Duration(0.05));
-                listener.lookupTransform("map", "base_link", ros::Time(0), transform);
-            }
-            catch (tf::TransformException &ex)
-            {
-                ROS_ERROR("%s", ex.what());
-                continue;
-            }
+            // tf::TransformListener listener;
+            // tf::StampedTransform transform;
+            // try
+            // {
+            //     listener.lookupTransform("map", "base_link", ros::Time(0), transform);
+            // }
+            // catch (tf::TransformException &ex)
+            // {
+            //     ROS_ERROR("%s", ex.what());
+            //     continue;
+            // }
             //角度信息 待加
 
             my_point[0] = my_point[1];
@@ -391,14 +411,19 @@ int main(int argc, char **argv)
             }
             if (!color::color_center(img, my_point[1]))
             {
-                PIDController_Init(mypid_x);
-                PIDController_Init(mypid_y);
-                time2 = ros::Time::now();
-                sm.process_event(stop{});
+                if (j == 3)
+                {
+                    PIDController_Init(mypid_x);
+                    PIDController_Init(mypid_y);
+                    time2 = ros::Time::now();
+                    sm.process_event(stop{});
+                }
+                j++;
             }
-            my_velocity.linear_x = PIDController_Update(mypid_x, my_point[1].x, 240, coff);
-            my_velocity.linear_y = PIDController_Update(mypid_y, my_point[1].y, 320, coff);
-            my_velocity.linear_z = PIDController_Update(mypid_z, transform.getOrigin().z(), 1.0, 1);
+            my_velocity.linear_x = -PIDController_Update(mypid_y, my_point[1].y, 240, coff);
+            my_velocity.linear_y = -PIDController_Update(mypid_x, my_point[1].x, 320, coff);
+            my_velocity.linear_z = 0.0;
+            // my_velocity.linear_z = PIDController_Update(mypid_z, transform.getOrigin().z(), 1.0, 1);
             ROS_INFO("car cord is (%f,%f)", my_point[1].x, my_point[1].y);
             ROS_INFO("giving speed is (%f,%f,%f)", my_velocity.linear_x, my_velocity.linear_y, my_velocity.linear_z);
             sm.process_event(set_speed{});
@@ -407,13 +432,14 @@ int main(int argc, char **argv)
         {
 
             ROS_INFO("enter landing");
-            if (ros::Time::now() - time2 <= ros::Duration(5.0))
+            if (ros::Time::now() - time2 <= ros::Duration(6.0))
             {
-                target.set(0, 0, -0.2);
-                sm.process_event(set_position{});
+                ROS_INFO("TEST");
+                my_velocity.set(0, 0, -0.2, 0, 0, 0);
+                sm.process_event(set_speed{});
             }
 
-            if (ros::Time::now() - time2 > ros::Duration(10.0))
+            if (ros::Time::now() - time2 > ros::Duration(6.0))
             {
                 ROS_INFO("gonna lock");
                 sm.process_event(lock_{});

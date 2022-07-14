@@ -1,25 +1,25 @@
 #PID参数
 #for xy
-Ki: 0
-Kd: 0
-Kp: 5.0
+Ki: 0.42
+Kd: 0.011
+Kp: 0.84
 
 # for z
 Ki_: 0
 Kd_: 0
-Kp_: 1.2
+Kp_: 0.6
 
 
 #Output limits (pid->out)
-limMin: -1.0
-limMax: 1.0
+limMin: -2.0
+limMax: 2.0
 
 
 limMin_: -1.0
 limMax_: 1.0
 #Integrator limits
-limMinInt: -10.0
-limMaxInt: 10.0
+limMinInt: -5
+limMaxInt: 5
 
 limMinInt_: -10.0
 limMaxInt_: 10.0

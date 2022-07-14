@@ -14,7 +14,9 @@ find_package(catkin REQUIRED COMPONENTS
   pluginlib
   roscpp
   std_msgs
+  image_transport
   tf
+##cv_bridge
 )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 find_package(OpenCV 3 QUIET)

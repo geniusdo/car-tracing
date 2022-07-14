@@ -99,6 +99,10 @@ float PIDController_Update(PIDController &pid, float setpoint, float measurement
 	pid.prevMeasurement = measurement;
 
 	/* Return controller output */
+	if (pid.out < 0.045 && pid.out > -0.045)
+	{
+		pid.out = 0;
+	}
 	return pid.out;
 }
 
